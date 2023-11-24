@@ -5,12 +5,13 @@
     "NeuralNetwork": {
         "Profile": {"enable": 1},
         "Architecture": {
-            "model_type": "GIN",
+            "model_type": "EGNN",
+            "activation_function": "silu",
             "radius": 7,
-            "max_neighbours": 5,
+            "max_neighbours": 30,
             "periodic_boundary_conditions": false,
-            "hidden_dim": 5,
-            "num_conv_layers": 6,
+            "hidden_dim": 128,
+            "num_conv_layers": 1,
             "output_heads": {
                 "graph":{
                     "num_sharedlayers": 2,
@@ -22,23 +23,23 @@
             "task_weights": [1.0]
         },
         "Variables_of_interest": {
-            "input_node_features": [0],
-            "output_names": ["free_energy"],
+            "input_node_features": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            "output_names": ["alpha"],
             "output_index": [0],
             "output_dim": [1],
             "type": ["graph"],
             "denormalize_output": false
         },
         "Training": {
-            "num_epoch": 2,
-            "perc_train": 0.7,
-            "loss_function_type": "mse",
-            "batch_size": 64,
+            "num_epoch": 1000,
+            "perc_train": 0.764344841818835,
+            "loss_function_type": "mae",
+            "batch_size": 96,
             "continue": 0,
             "startfrom": "existing_model",
             "Optimizer": {
                 "type": "AdamW",
-                "learning_rate": 1e-3
+                "learning_rate": 5e-4
             }
         }
     },

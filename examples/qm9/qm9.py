@@ -1,7 +1,11 @@
 import os, json
 
+import numpy as np
+
 import torch
 import torch_geometric
+import flatten_json
+import wandb
 
 # deprecated in torch_geometric 2.0
 try:
@@ -53,27 +57,32 @@ hydragnn.utils.setup_log(log_name)
 # NOTE: data is moved to the device in the pre-transform.
 # NOTE: transforms/filters will NOT be re-run unless the qm9/processed/ directory is removed.
 dataset = torch_geometric.datasets.QM9(
-    root="dataset/qm9", pre_transform=qm9_pre_transform, pre_filter=qm9_pre_filter
+    root="dataset/qm9", # pre_transform=qm9_pre_transform, pre_filter=qm9_pre_filter
 )
-train, val, test = hydragnn.preprocess.split_dataset(
-    dataset, config["NeuralNetwork"]["Training"]["perc_train"], False
-)
+# EGNN splits
+dataset_rng = np.random.RandomState(seed=0)
+permutation = dataset_rng.permutation(len(dataset))
+dataset = dataset[permutation]
+train, val, test = map(dataset.__getitem__, np.split(permutation, [100_000, 100_000 + 17_748]))
+breakpoint()
 (train_loader, val_loader, test_loader,) = hydragnn.preprocess.create_dataloaders(
     train, val, test, config["NeuralNetwork"]["Training"]["batch_size"]
 )
 
 config = hydragnn.utils.update_config(config, train_loader, val_loader, test_loader)
 
+breakpoint()
 model = hydragnn.models.create_model_config(
     config=config["NeuralNetwork"],
     verbosity=verbosity,
 )
+breakpoint()
 model = hydragnn.utils.get_distributed_model(model, verbosity)
 
 learning_rate = config["NeuralNetwork"]["Training"]["Optimizer"]["learning_rate"]
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, mode="min", factor=0.5, patience=5, min_lr=0.00001
+lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+    optimizer, config["NeuralNetwork"]["Training"]["num_epochs"]
 )
 
 # Run training with the given model and qm9 dataset.

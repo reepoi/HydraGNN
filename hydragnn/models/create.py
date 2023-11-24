@@ -281,6 +281,7 @@ def create_model(
         )
 
     elif model_type == "EGNN":
+        breakpoint()
         model = EGCLStack(
             edge_dim,
             input_dim,

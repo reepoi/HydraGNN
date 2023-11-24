@@ -51,6 +51,7 @@ class EGCLStack(Base):
             output_channels=output_dim,
             hidden_channels=self.hidden_dim,
             edge_attr_dim=self.edge_dim,
+            act_fn=self.activation_function,
             equivariant=self.equivariance and not last_layer,
         )
 
