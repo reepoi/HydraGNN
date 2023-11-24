@@ -7,11 +7,11 @@
         "Architecture": {
             "model_type": "EGNN",
             "activation_function": "silu",
-            "radius": 7,
+            "radius": 100,
             "max_neighbours": 30,
             "periodic_boundary_conditions": false,
             "hidden_dim": 128,
-            "num_conv_layers": 1,
+            "num_conv_layers": 7,
             "output_heads": {
                 "graph":{
                     "num_sharedlayers": 1,
@@ -40,7 +40,8 @@
             "Optimizer": {
                 "type": "AdamW",
                 "learning_rate": 5e-4
-            }
+            },
+            "Checkpoint": true
         }
     },
     "Visualization": {

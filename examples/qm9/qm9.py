@@ -4,6 +4,7 @@ import numpy as np
 
 import torch
 import torch_geometric
+import torch_geometric.transforms as T
 import flatten_json
 import wandb
 
@@ -14,6 +15,36 @@ except:
     from torch_geometric.data import DataLoader
 
 import hydragnn
+
+
+class CormorantFeatures(T.BaseTransform):
+    def __init__(self, max_atomic_number, max_exponent):
+        self.max_atomic_number = max_atomic_number
+        self.max_exponent = max_exponent
+
+    def __call__(self, data):
+        atomic_numbers = data.x[:, 5]
+        exponents = torch.arange(self.max_exponent + 1).to(data.x)
+        Z_vec = (
+            atomic_numbers[:, None] / self.max_atomic_number
+        ).pow(exponents).view(-1, exponents.size(0))
+        onehots = data.x[:, :5]
+        data.x = (
+            onehots[..., None] * Z_vec[:, None]
+        ).view(-1, 5 * (self.max_exponent + 1))
+
+        return data
+
+
+class SelectProperty(T.BaseTransform):
+    def __init__(self, property_idx):
+        self.property_idx = property_idx
+
+    def __call__(self, data):
+        data.y = data.y[:, self.property_idx]
+
+        return data
+
 
 # Update each sample prior to loading.
 def qm9_pre_transform(data):
@@ -63,15 +94,16 @@ dataset = torch_geometric.datasets.QM9(
 dataset_rng = np.random.RandomState(seed=0)
 permutation = dataset_rng.permutation(len(dataset))
 dataset = dataset[permutation]
-train, val, test = map(dataset.__getitem__, np.split(permutation, [100_000, 100_000 + 17_748]))
-breakpoint()
+splits = np.split(permutation, [100_000, 100_000 + 17_748])
+max_atomic_number = dataset[splits[0]].data.x[:, 5].max().item()
+dataset.transform = T.Compose([SelectProperty(1),
+                               CormorantFeatures(max_atomic_number, 2)])
 (train_loader, val_loader, test_loader,) = hydragnn.preprocess.create_dataloaders(
-    train, val, test, config["NeuralNetwork"]["Training"]["batch_size"]
+    *map(dataset.__getitem__, splits), config["NeuralNetwork"]["Training"]["batch_size"]
 )
 
 config = hydragnn.utils.update_config(config, train_loader, val_loader, test_loader)
 
-breakpoint()
 model = hydragnn.models.create_model_config(
     config=config["NeuralNetwork"],
     verbosity=verbosity,
@@ -81,7 +113,7 @@ model = hydragnn.utils.get_distributed_model(model, verbosity)
 
 learning_rate = config["NeuralNetwork"]["Training"]["Optimizer"]["learning_rate"]
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
     optimizer, config["NeuralNetwork"]["Training"]["num_epoch"]
 )
 
