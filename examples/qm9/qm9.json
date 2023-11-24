@@ -14,10 +14,10 @@
             "num_conv_layers": 1,
             "output_heads": {
                 "graph":{
-                    "num_sharedlayers": 2,
-                    "dim_sharedlayers": 5,
-                    "num_headlayers": 2,
-                    "dim_headlayers": [50,25]
+                    "num_sharedlayers": 1,
+                    "dim_sharedlayers": 128,
+                    "num_headlayers": 0,
+                    "dim_headlayers": [128]
                 }
             },
             "task_weights": [1.0]

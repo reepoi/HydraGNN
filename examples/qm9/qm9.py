@@ -82,7 +82,7 @@ model = hydragnn.utils.get_distributed_model(model, verbosity)
 learning_rate = config["NeuralNetwork"]["Training"]["Optimizer"]["learning_rate"]
 optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
 lr_scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-    optimizer, config["NeuralNetwork"]["Training"]["num_epochs"]
+    optimizer, config["NeuralNetwork"]["Training"]["num_epoch"]
 )
 
 # Run training with the given model and qm9 dataset.

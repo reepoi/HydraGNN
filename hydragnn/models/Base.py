@@ -10,7 +10,7 @@
 ##############################################################################
 
 import torch
-from torch.nn import ModuleList, Sequential, ReLU, Linear, Module
+from torch.nn import ModuleList, ModuleDict, Sequential, Identity, ReLU, Linear, Module
 import torch.nn.functional as F
 from torch_geometric.nn import global_mean_pool, BatchNorm
 from torch.nn import GaussianNLLLoss
@@ -46,7 +46,8 @@ class Base(Module):
         self.dropout = dropout
         self.num_conv_layers = num_conv_layers
         self.graph_convs = ModuleList()
-        self.feature_layers = ModuleList()
+        self.feature_layers = ModuleDict(dict(encoder=Identity(),
+                                              decoder=Identity()))
         self.num_nodes = num_nodes
         ##One head represent one variable
         ##Head can have different sizes, head_dims
@@ -124,7 +125,7 @@ class Base(Module):
         return conv_args
 
     def _freeze_conv(self):
-        for module in [self.graph_convs, self.feature_layers]:
+        for module in [self.graph_convs, self.feature_layers.values()]:
             for layer in module:
                 for param in layer.parameters():
                     param.requires_grad = False
@@ -196,20 +197,17 @@ class Base(Module):
             if self.head_type[ihead] == "graph":
                 num_head_hidden = self.config_heads["graph"]["num_headlayers"]
                 dim_head_hidden = self.config_heads["graph"]["dim_headlayers"]
+                dim_head_hidden = [dim_sharedlayers, *dim_head_hidden]
                 denselayers = []
-                denselayers.append(Linear(dim_sharedlayers, dim_head_hidden[0]))
-                denselayers.append(self.activation_function)
-                for ilayer in range(num_head_hidden - 1):
-                    denselayers.append(
-                        Linear(dim_head_hidden[ilayer], dim_head_hidden[ilayer + 1])
-                    )
+                for i, (d_in, d_out) in enumerate(zip(dim_head_hidden,
+                                                      dim_head_hidden[1:])):
+                    if i == num_head_hidden:
+                        break
+                    denselayers.append(Linear(d_in, d_out))
                     denselayers.append(self.activation_function)
-                denselayers.append(
-                    Linear(
-                        dim_head_hidden[-1],
-                        self.head_dims[ihead] + self.ilossweights_nll * 1,
-                    )
-                )
+                denselayers.append(Linear(
+                    d_out, self.head_dims[ihead] + self.ilossweights_nll * 1
+                ))
                 head_NN = Sequential(*denselayers)
             elif self.head_type[ihead] == "node":
                 self.node_NN_type = self.config_heads["node"]["type"]
@@ -256,10 +254,12 @@ class Base(Module):
         pos = data.pos
 
         ### encoder part ####
+        x = self.feature_layers['encoder'](x)
         conv_args = self._conv_args(data)
-        for conv, feat_layer in zip(self.graph_convs, self.feature_layers):
+        for i, conv in enumerate(self.graph_convs):
             c, pos = conv(x=x, pos=pos, **conv_args)
-            x = self.activation_function(feat_layer(c))
+            x = self.activation_function(self.feature_layers[str(i)](c))
+        x = self.feature_layers['decoder'](x)
 
         #### multi-head decoder part####
         # shared dense layers for graph level output
